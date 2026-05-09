@@ -60,6 +60,6 @@ The SessionStart hook nudges you weekly if you haven't run `/update-vendors`.
 
 This pattern is "llm-wiki" — originated by [Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and elaborated by [kennyg](https://gist.github.com/kennyg/6c45cace2e1c4e424a28fcd51dd6c25b), [NiharShrotri](https://github.com/NiharShrotri/llm-wiki), and [ekadetov](https://github.com/ekadetov/llm-wiki).
 
-This repo's runbook synthesizes those approaches with kepano's [obsidian-skills](https://github.com/kepano/obsidian-skills), the official [Obsidian CLI](https://obsidian.md/cli), and [tobilu/qmd](https://github.com/tobilu/qmd) for retrieval.
+This repo's runbook synthesizes those approaches with kepano's [obsidian-skills](https://github.com/kepano/obsidian-skills), the official [Obsidian CLI](https://obsidian.md/cli), and [tobi/qmd](https://github.com/tobi/qmd) for retrieval.
 
 See [`docs/prior-art.md`](./docs/prior-art.md) for what was adopted from each source. See [`CLAUDE.md`](./CLAUDE.md) for design philosophy.

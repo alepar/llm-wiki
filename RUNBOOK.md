@@ -1609,7 +1609,7 @@ qmd embed   # only if many new files were added
 
 **Install commands (user-run by default; agent-runnable on per-session opt-in via the install-helper recipe).** The recipe is documented in Phase 6 of the runbook (this is reproduced here for runtime reference):
 
-1. Fetch `https://raw.githubusercontent.com/tobilu/qmd/main/README.md` (or the GitHub releases page if the README fetch fails).
+1. Fetch `https://raw.githubusercontent.com/tobi/qmd/main/README.md` (or the GitHub releases page if the README fetch fails).
 2. Parse install methods: `brew`, `scoop`, `winget`, `apt`, `cargo install`, prebuilt-binary download, `bun install -g`, `npm install -g`, source build.
 3. Detect environment: `uname -s`, `uname -m`, `command -v` checks for each package manager.
 4. Rank by friction (lowest first): platform-native PM with autoupdate (brew/scoop/winget/apt) → prebuilt binary → language toolchain (cargo/bun/npm) → source build.
@@ -1794,8 +1794,8 @@ The install-helper recipe is the canonical install workflow for any external CLI
 - [ ] **Step 1: Fetch latest install guidance**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tobilu/qmd/main/README.md > /tmp/qmd-README.md 2>/dev/null \
-  || curl -fsSL 'https://github.com/tobilu/qmd/releases/latest' > /tmp/qmd-releases.html
+curl -fsSL https://raw.githubusercontent.com/tobi/qmd/main/README.md > /tmp/qmd-README.md 2>/dev/null \
+  || curl -fsSL 'https://github.com/tobi/qmd/releases/latest' > /tmp/qmd-releases.html
 ```
 
 If both fetches fail, surface the network error and stop.
@@ -1837,9 +1837,9 @@ done
 Print the top recommendation + up to 2 alternatives. Example for a mac user with brew:
 
 ```
-Recommended: brew install tobilu/qmd/qmd
+Recommended: brew install tobi/qmd/qmd
 Alternatives:
-  - prebuilt binary: curl -fsSL https://github.com/tobilu/qmd/releases/.../install.sh | sh
+  - prebuilt binary: curl -fsSL https://github.com/tobi/qmd/releases/.../install.sh | sh
   - bun: bun install -g @tobilu/qmd
 
 Run the recommended command? [agent-runs / I'll-run-it / show-other-options]

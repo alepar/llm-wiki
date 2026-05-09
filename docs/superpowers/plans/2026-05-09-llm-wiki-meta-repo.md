@@ -363,7 +363,7 @@ The SessionStart hook nudges you weekly if you haven't run `/update-vendors`.
 
 This pattern is "llm-wiki" — originated by [Andrej Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and elaborated by [kennyg](https://gist.github.com/kennyg/6c45cace2e1c4e424a28fcd51dd6c25b), [NiharShrotri](https://github.com/NiharShrotri/llm-wiki), and [ekadetov](https://github.com/ekadetov/llm-wiki).
 
-This repo's runbook synthesizes those approaches with kepano's [obsidian-skills](https://github.com/kepano/obsidian-skills), the official [Obsidian CLI](https://obsidian.md/cli), and [tobilu/qmd](https://github.com/tobilu/qmd) for retrieval.
+This repo's runbook synthesizes those approaches with kepano's [obsidian-skills](https://github.com/kepano/obsidian-skills), the official [Obsidian CLI](https://obsidian.md/cli), and [tobi/qmd](https://github.com/tobi/qmd) for retrieval.
 
 See [`docs/prior-art.md`](./docs/prior-art.md) for what was adopted from each source. See [`CLAUDE.md`](./CLAUDE.md) for design philosophy.
 ````
@@ -1489,7 +1489,7 @@ qmd embed   # only if many new files were added
 
 **Install commands (user-run by default; agent-runnable on per-session opt-in via the install-helper recipe).** The recipe is documented in Phase 6 of the runbook (this is reproduced here for runtime reference):
 
-1. Fetch `https://raw.githubusercontent.com/tobilu/qmd/main/README.md` (or the GitHub releases page if the README fetch fails).
+1. Fetch `https://raw.githubusercontent.com/tobi/qmd/main/README.md` (or the GitHub releases page if the README fetch fails).
 2. Parse install methods: `brew`, `scoop`, `winget`, `apt`, `cargo install`, prebuilt-binary download, `bun install -g`, `npm install -g`, source build.
 3. Detect environment: `uname -s`, `uname -m`, `command -v` checks for each package manager.
 4. Rank by friction (lowest first): platform-native PM with autoupdate (brew/scoop/winget/apt) → prebuilt binary → language toolchain (cargo/bun/npm) → source build.
@@ -1595,8 +1595,8 @@ The install-helper recipe is the canonical install workflow for any external CLI
 - [ ] **Step 1: Fetch latest install guidance**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tobilu/qmd/main/README.md > /tmp/qmd-README.md 2>/dev/null \
-  || curl -fsSL 'https://github.com/tobilu/qmd/releases/latest' > /tmp/qmd-releases.html
+curl -fsSL https://raw.githubusercontent.com/tobi/qmd/main/README.md > /tmp/qmd-README.md 2>/dev/null \
+  || curl -fsSL 'https://github.com/tobi/qmd/releases/latest' > /tmp/qmd-releases.html
 ```
 
 If both fetches fail, surface the network error and stop.
@@ -1638,9 +1638,9 @@ done
 Print the top recommendation + up to 2 alternatives. Example for a mac user with brew:
 
 ```
-Recommended: brew install tobilu/qmd/qmd
+Recommended: brew install tobi/qmd/qmd
 Alternatives:
-  - prebuilt binary: curl -fsSL https://github.com/tobilu/qmd/releases/.../install.sh | sh
+  - prebuilt binary: curl -fsSL https://github.com/tobi/qmd/releases/.../install.sh | sh
   - bun: bun install -g @tobilu/qmd
 
 Run the recommended command? [agent-runs / I'll-run-it / show-other-options]
@@ -1963,7 +1963,7 @@ If markers appear in any of the four target files, fix and amend the relevant co
 for url in \
   https://github.com/199-biotechnologies/claude-deep-research-skill \
   https://github.com/kepano/obsidian-skills \
-  https://github.com/tobilu/qmd \
+  https://github.com/tobi/qmd \
   https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f \
   https://github.com/NiharShrotri/llm-wiki \
   https://github.com/ekadetov/llm-wiki ; do

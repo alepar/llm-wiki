@@ -99,9 +99,9 @@ Research conducted 2026-05-09 ahead of writing this repo's runbook. Captures wha
 
 **Sharp take.** No battle-tested CLI vault-linter exists as of May 2026. The official CLI is too new to lean on heavily; third-party CLIs are one-maintainer projects. Vault hygiene stays LLM-driven (orphans, contradictions, stale claims); deterministic-rule lint is limited to what `obsidian unresolved` and our frontmatter pass can check.
 
-## 7. tobilu/qmd (search backend)
+## 7. tobi/qmd (search backend)
 
-**URL:** https://github.com/tobilu/qmd
+**URL:** https://github.com/tobi/qmd
 
 **Summary.** Hybrid retrieval CLI + MCP — BM25 + vector embeddings + LLM rerank against local markdown collections. Single-file SQLite index per collection. Ships an official Claude Code plugin (`tobi/qmd`) that exposes the index over MCP.
 

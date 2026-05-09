@@ -184,9 +184,9 @@ Generic recipe used in Phases 4.5 (Obsidian CLI) and 6.2 (qmd). Inline in the ru
    4. Source build — last resort
 5. **Present recommendation** with top choice + up to 2 alternatives. Example output:
    ```
-   Recommended (mac, brew installed): `brew install tobilu/qmd/qmd`
+   Recommended (mac, brew installed): `brew install tobi/qmd/qmd`
    Alternatives:
-     - prebuilt binary: `curl -fsSL https://github.com/tobilu/qmd/releases/.../install.sh | sh`
+     - prebuilt binary: `curl -fsSL https://github.com/tobi/qmd/releases/.../install.sh | sh`
      - bun: `bun install -g @tobilu/qmd`
 
    Run the recommended command? [agent-runs / I'll-run-it / show-other-options]
