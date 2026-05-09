@@ -2,7 +2,7 @@
 
 > A single self-sufficient procedure for spinning up a new markdown wiki vault, designed to be fed verbatim to a fresh Claude Code session along with a chosen domain. The session collects three inputs (vault name, identity statement, target directory), then mechanically scaffolds a git-tracked vault with qmd hybrid retrieval, a pinned deep-research submodule, and committed `wiki-research` + `recall` slash-command skills.
 >
-> **No other file needs to be consulted.** Every literal template, every command, every invariant is reproduced inline. The companion design spec (`docs/specs/2026-05-08-llm-wiki-framework-design.md`) contains rationale and alternatives but is not required for execution.
+> **No other file needs to be consulted.** Every literal template, every command, every invariant is reproduced inline. The companion design spec (`docs/superpowers/specs/2026-05-09-llm-wiki-meta-design.md`) contains rationale and alternatives but is not required for execution.
 
 ## How to use this runbook
 
@@ -230,17 +230,18 @@ A page that's still being filled in is a normal wiki page, not a `raw/` document
 
 # Part III: Procedure
 
-The procedure has 8 phases. Each phase ends with at least one git commit (so the work is recoverable mid-instantiation if anything goes wrong).
+The procedure has 9 phases. Each phase ends with at least one git commit (so the work is recoverable mid-instantiation if anything goes wrong).
 
 | Phase | Purpose | Mutates |
 |---|---|---|
 | 0 | Capture inputs | none |
-| 1 | Empty repo bootstrap | `<vault-root>/`, `git init`, `.gitignore`, `README.md`, `.research/.gitkeep` |
+| 1 | Empty repo bootstrap | `<vault-root>/`, `git init`, `.gitignore`, `README.md`, `.research/.gitkeep`, `raw/.gitkeep`, `raw/README.md` |
 | 2 | Page type templates | `.templates/{entity,concept,synthesis}.md` |
-| 3 | Committed skills | `.claude/skills/{recall,wiki-research}/...` |
-| 4 | Deep-research submodule | `.gitmodules`, `.claude/skills/deep-research/` |
+| 3 | Committed skills | `.claude/skills/{recall,wiki-research,update-vendors}/...` |
+| 4 | Pinned submodules (deep-research, obsidian-skills) | `.gitmodules`, `.claude/skills/{deep-research,obsidian-skills}/` |
+| 4.5 | Obsidian CLI + SessionStart hook | `.claude/hooks/session-start.sh`, `.claude/settings.json` |
 | 5 | Vault `CLAUDE.md` | `CLAUDE.md` (+ optional domain extensions) |
-| 6 | qmd setup (printed; user-run) | qmd's local cache, not the vault |
+| 6 | qmd setup (install-helper recipe; printed; user-run) | qmd's local cache, not the vault |
 | 7 | Verification | none |
 | 8 | Hand-off (deferred: first real page) | none |
 
@@ -655,7 +656,7 @@ starting. High-level:
    directly answers the question. Otherwise continue.
 4. Build a seed brief for `deep-research` containing the question, vault
    evidence, and known gaps.
-5. Invoke the `deep-research` skill (Standard mode by default) with the seed
+5. Invoke the `deep-research` skill (UltraDeep mode by default — see "Default mode" section above) with the seed
    brief; override its output path to `.research/<topic-slug>_<YYYYMMDD>/`.
 6. Cross-check findings against the vault. **Stop and ask the user on any
    contradiction.**
@@ -1252,9 +1253,7 @@ else
   fi
   index_mtime=$(qmd status --json 2>/dev/null | grep -o '"last_updated":[^,}]*' | head -1 | tr -d ' "' | cut -d: -f2-)
   if [ -n "$newest_md" ] && [ -n "$index_mtime" ] && [ "$(printf '%.0f' "$newest_md")" -gt "$(printf '%.0f' "$index_mtime" 2>/dev/null || echo 0)" ]; then
-    qmd update >/dev/null 2>>"$LOG" && printf 'qmd: refreshed index\n'
-    # If many new files lack embeddings, also embed
-    qmd embed --check 2>/dev/null | grep -q 'pending' && qmd embed >/dev/null 2>>"$LOG" && printf 'qmd: re-embedded\n'
+    qmd update >/dev/null 2>>"$LOG" && printf 'qmd: refreshed index (run `qmd embed` if many new files were added)\n'
   fi
 fi
 
@@ -1482,12 +1481,11 @@ Never edit an existing synthesis page to change the answer. Instead:
 - Set the old page's `superseded_by:` to the new page's `qmd://<vault-name>/<path>`.
 - Mention the supersession in the new page's body.
 
-## What goes into qmd directly (raw sources)
+## What goes into `raw/` (and what `qmd ingest` is NOT used for)
 
-Web pages, papers, docs — ingest into qmd with `qmd ingest <url>` (the user
-runs this; never the agent). They are NOT copied into the vault; `qmd://`
-URLs are vault-only. Synthesis pages link to raw sources by their `https://`
-URLs.
+Source documents that the wiki cites for long-term grounding go into the vault's `raw/` folder as cleaned-up markdown — typically via the **defuddle** skill for web articles, or by manual placement for papers/blog posts. They are committed to git (vault stays portable) and indexed by qmd as the `raw` retrieval scope. Synthesis pages cite them via `qmd://<vault-name>/raw/<slug>.md`; non-ingested sources are still cited by their `https://...` URL.
+
+The qmd-native `qmd ingest <url>` command (which adds external URLs to qmd's index without committing markdown to the vault) is **not used by this framework** — it would break vault portability since the index isn't reproducible from the repo alone. Per Invariant 4 the agent never runs it. Users may run it ad-hoc but should prefer the defuddle → `raw/` workflow above.
 
 ## Research artifacts stay in the vault
 
@@ -2075,7 +2073,7 @@ The vault's content is the source of truth; qmd is a derived index. The submodul
 
 # Self-review (post-write)
 
-This runbook merges the design spec (`docs/specs/2026-05-08-llm-wiki-framework-design.md`) and the original plan into a single self-sufficient document. Coverage:
+This runbook merges the design spec (`docs/superpowers/specs/2026-05-09-llm-wiki-meta-design.md`) and the original plan into a single self-sufficient document. Coverage:
 
 - Part I — framework summary, three-layer architecture, what-it-isn't, invariants. From spec §1, §2, §3.5, §5, §6, §7.8.
 - Part II — document model, frontmatter contracts, wikilinks, supersession, type extensions. From spec §4.
