@@ -664,9 +664,9 @@ starting. High-level:
 
 ## Hard rules
 
-- Do NOT run `qmd update` automatically after writes. The session-end commit
-  reminder (per the vault `CLAUDE.md` retrieval-primitives section) is the
-  only mechanism that updates the index.
+- The SessionStart hook handles index freshness automatically — do NOT run
+  `qmd update` after each individual write. Running it ad-hoc at session end
+  or to settle a known stale state is acceptable but not required.
 - Synthesis pages have `question:`, `answered_at:`, `superseded_by:`
   (initially `null`), and a complete `sources:` list of every URL cited in
   the body.
@@ -1244,8 +1244,12 @@ elif ! qmd status >/dev/null 2>&1; then
   printf 'qmd: status check failed — see Phase 6 setup or .research/.session-start.log\n'
   qmd status 2>>"$LOG"
 else
-  # Check for staleness: any .md newer than the qmd index
-  newest_md=$(find . -name '*.md' -not -path './.*' -not -path './node_modules/*' -type f -printf '%T@\n' 2>/dev/null | sort -rn | head -1)
+  # Check for staleness: any .md newer than the qmd index (portable across BSD/GNU find)
+  if [ "$(uname -s)" = "Darwin" ] || [ "$(uname -s)" = "FreeBSD" ]; then
+    newest_md=$(find . -name '*.md' -not -path './.*' -not -path './node_modules/*' -type f -exec stat -f '%m' {} \; 2>/dev/null | sort -rn | head -1)
+  else
+    newest_md=$(find . -name '*.md' -not -path './.*' -not -path './node_modules/*' -type f -printf '%T@\n' 2>/dev/null | sort -rn | head -1)
+  fi
   index_mtime=$(qmd status --json 2>/dev/null | grep -o '"last_updated":[^,}]*' | head -1 | tr -d ' "' | cut -d: -f2-)
   if [ -n "$newest_md" ] && [ -n "$index_mtime" ] && [ "$(printf '%.0f' "$newest_md")" -gt "$(printf '%.0f' "$index_mtime" 2>/dev/null || echo 0)" ]; then
     qmd update >/dev/null 2>>"$LOG" && printf 'qmd: refreshed index\n'
@@ -1966,7 +1970,7 @@ Expected: `nothing to commit, working tree clean`.
 git log --oneline
 ```
 
-Expected: 7 commits, in this order (most recent first):
+Expected: 6 commits in this order (most recent first), or 7 if `git init` emitted an initial empty commit (uncommon in git ≥ 2.28):
 
 1. `scaffold: add vault CLAUDE.md ...`
 2. `scaffold: add SessionStart hook for qmd freshness + vendor-update nudge`
@@ -1974,8 +1978,6 @@ Expected: 7 commits, in this order (most recent first):
 4. `scaffold: add wiki-research, recall, and update-vendors skills`
 5. `scaffold: add entity/concept/synthesis page templates`
 6. `scaffold: initialize <vault-name> repo (gitignore, README, .research, raw)`
-
-(Plus an initial empty commit if `git init` produced one — usually 6 commits total in newer git versions, 7 if older.)
 
 If the count or order differs significantly, report to the user; some scaffolding step may have been merged or split.
 
@@ -2013,7 +2015,7 @@ Tell the user:
 
 > Vault `<vault-name>` is operational at `<vault-root>`.
 >
-> Five scaffolding commits are in place. The qmd collection is set up and embedded. The deep-research submodule is pinned. The wiki-research and recall skills are committed and discoverable.
+> Six scaffolding commits are in place (seven on older git). The qmd collection is set up and embedded. Both submodules (deep-research, obsidian-skills) are pinned. The wiki-research, recall, and update-vendors skills are committed and discoverable. The SessionStart hook is active and the Obsidian CLI is installed.
 >
 > To write the first real page, either:
 > 1. Invoke `/wiki-research <your-question>` and follow the skill's loop end-to-end; or
