@@ -1,0 +1,5 @@
+# OS / editor state
+.DS_Store
+*.swp
+.idea/
+.vscode/
