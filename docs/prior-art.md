@@ -99,6 +99,36 @@ Research conducted 2026-05-09 ahead of writing this repo's runbook. Captures wha
 
 **Sharp take.** No battle-tested CLI vault-linter exists as of May 2026. The official CLI is too new to lean on heavily; third-party CLIs are one-maintainer projects. Vault hygiene stays LLM-driven (orphans, contradictions, stale claims); deterministic-rule lint is limited to what `obsidian unresolved` and our frontmatter pass can check.
 
+## 7. tobilu/qmd (search backend)
+
+**URL:** https://github.com/tobilu/qmd
+
+**Summary.** Hybrid retrieval CLI + MCP — BM25 + vector embeddings + LLM rerank against local markdown collections. Single-file SQLite index per collection. Ships an official Claude Code plugin (`tobi/qmd`) that exposes the index over MCP.
+
+**Adopted as the assumed retrieval backend.** Adoption preceded this survey — qmd is the load-bearing primitive that makes the LLM-wiki pattern work at scale (Karpathy's gist explicitly calls it out as the recommended retriever). The survey of alternatives (lunr, ripgrep, sqlite-fts, embedding-only stores) was not conducted because:
+
+- qmd is the only retriever the surveyed authors converged on.
+- Hybrid (BM25 + vector + rerank) outperforms any single-approach retriever for the curated-wiki + ingested-source mix this pattern produces.
+- The official MCP plugin makes Claude Code integration trivial.
+
+**Trade-offs noted:**
+- One collection per vault — fine for this scope, doesn't cleanly support a multi-vault workspace if one ever materializes.
+- Index lives in `~/.cache/qmd/`, not in the vault repo — must be rebuilt after a fresh clone.
+- Mutating ops (`qmd ingest`, `qmd collection add`) are user-run only by policy (Invariant 4).
+
+## 8. 199-biotechnologies/claude-deep-research-skill (deep-research submodule)
+
+**URL:** https://github.com/199-biotechnologies/claude-deep-research-skill
+
+**Summary.** Claude Code skill for multi-source web research with citation tracking. Supports Quick / Standard / Deep / UltraDeep modes; produces structured markdown reports with source-attributed claims.
+
+**Adopted as the deep-research submodule** pinned at `.claude/skills/deep-research/`. Like qmd, adoption preceded the survey — the wiki-research workflow needs a thorough web-research primitive, and this skill is the most actively maintained option in May 2026. The wiki-research playbook calls into it whenever vault coverage is insufficient to answer a question (default mode: UltraDeep).
+
+**Trade-offs noted:**
+- API key requirements vary by deep-research mode — surfaced verbatim if missing.
+- Output schema may evolve upstream — pinned by submodule SHA; bumped via `/update-vendors`.
+- Only the markdown report is consumed by wiki-research; HTML/PDF artifacts are ignored.
+
 ## Cross-cutting takeaways
 
 1. NiharShrotri's three retrieval scopes — adopted.
