@@ -1496,22 +1496,56 @@ Use [label](https://...) for external links.
 
 ## Diagrams
 
-For diagrams — flowcharts, sequence, state, ER, class — prefer ```mermaid
-blocks. Fall back to ASCII or Unicode line-drawing only when mermaid can't
-express the structure. Mermaid renders natively in Obsidian preview and on
-GitHub, stays diff-friendly, and remains editable by both humans and agents.
+Prefer Mermaid for any flowchart, sequence, state, class, or block diagram.
+Use a fenced ` ```mermaid ` block — Obsidian renders these natively in
+reading view and Live Preview, and they survive renames and edits better
+than ASCII box-drawing art.
 
-Code blocks holding literal text — directory trees, command transcripts,
-sample frontmatter, file layouts — are not diagrams; leave those as plain
-code blocks.
+ASCII fallback is allowed only when Mermaid genuinely can't express the
+layout (rare). When you fall back, leave a one-line note in the page
+explaining why so a future reader doesn't "fix" it.
 
-Example:
+### Mermaid + Obsidian gotchas (multi-line node labels)
 
-```mermaid
-flowchart TD
-  A[Layer 1: Workflow prose] -->|consults| B[Layer 2: Retrieval primitives]
-  B -->|invokes| C[Layer 3: qmd]
+What we want from a node with several lines of content: **wide boxes** so
+the diagram doesn't waste horizontal space, and **left-aligned content**
+so bullet points line up. Mermaid's defaults give neither — boxes auto-
+wrap text at ~200px and all node text is centered. Several documented
+Mermaid knobs (`themeCSS` injection, `flowchart.htmlLabels: false`) are
+silently dropped by Obsidian's renderer, so we can't fix this via theme
+or directive configuration.
+
+What does work, applied per node:
+
+1. **Wider boxes** — use markdown-string labels (backtick-wrapped inside
+   the quotes) and raise the wrap point at the top of the diagram:
+
+   ```
+   %%{init: {'flowchart': {'wrappingWidth': 500}}}%%
+   ```
+
+   `wrappingWidth` (default 200px) only takes effect on markdown-string
+   labels. Plain HTML labels still wrap at the default.
+
+2. **Left-aligned content** — wrap the label body in an inline
+   `<div style='text-align:left'>...</div>`. Obsidian passes inline
+   `style=` through to the foreignObject HTML where it strips
+   stylesheet-level overrides.
+
+3. **Bold inside the `<div>`** — CommonMark suppresses markdown parsing
+   inside an HTML block, so `**TEXT**` renders as literal asterisks.
+   Use `<b>TEXT</b>` instead.
+
+Putting it together (single node):
+
 ```
+A["`<div style='text-align:left'><b>NODE TITLE</b>
+• first bullet point
+• second bullet point</div>`"]
+```
+
+None of this matters for simple single-line labels — only reach for the
+recipe when a node carries multi-line content.
 
 ## Retrieval scopes
 
