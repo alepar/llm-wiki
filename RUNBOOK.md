@@ -481,7 +481,8 @@ Write `<vault-root>/.mcp.json` verbatim (no substitutions; `${CLAUDE_PROJECT_DIR
 test -f .qmd/index.yml && echo "index.yml OK"
 test -f .mcp.json && echo ".mcp.json OK"
 grep -c 'CLAUDE_PROJECT_DIR' .mcp.json   # expected: 2
-grep -c '<vault-name>' .qmd/index.yml    # expected: 1 (after substitution)
+grep -c '<vault-name>' .qmd/index.yml    # expected: 0 (placeholder was substituted with the kebab-case vault name from Phase 0)
+grep -c 'collections:'  .qmd/index.yml   # expected: 1 (the collections block exists)
 ```
 
 ### Task 1.7 — First commit
