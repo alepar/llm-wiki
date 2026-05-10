@@ -50,8 +50,9 @@ A self-contained git repository whose entire content is markdown — typed pages
                            ▼
 ┌────────────────────────────────────────────────────────────┐
 │ Layer 3: qmd (CLI + MCP plugin, stdio transport)           │
-│   One collection: the vault. Index at                      │
-│   ~/.cache/qmd/index.sqlite.                               │
+│   One collection per vault. Per-vault index at             │
+│   <vault-root>/.qmd/index.sqlite (driven by .mcp.json      │
+│   + .qmd/index.yml committed at the vault root).           │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,6 +61,8 @@ Two sidecar submodules pin at `.claude/skills/`:
 - `obsidian-skills` (kepano) — provides `defuddle` (web→clean markdown for `raw/` ingest) and `obsidian-markdown` (wikilink/callout/property syntax reference for authoring).
 
 Source documents ingested for long-term grounding land in a vault-root `raw/` folder, indexed by qmd alongside the wiki content. The vault therefore has three retrieval scopes: `wiki` (curated typed pages), `raw` (source documents), and `hybrid` (both).
+
+The qmd index is per-vault: SQLite at `<vault-root>/.qmd/index.sqlite` (gitignored), wired via committed `.mcp.json` (sets `INDEX_PATH` and `QMD_CONFIG_DIR` env vars for the qmd MCP server) and `.qmd/index.yml` (qmd's per-collection config). No cross-vault index contamination.
 
 ## I.2 What this vault is NOT
 
@@ -76,7 +79,7 @@ These are framework-invariant. The executor must not relax them based on perceiv
 1. **Three core page types: `entity`, `concept`, `synthesis`.** Domains may add additional types alongside these, but never in place of them.
 2. **Page type lives in frontmatter, never folder path.** No `entities/`, `concepts/`, or `synthesis/` top-level folders.
 3. **Synthesis pages are write-once.** Never edit an existing synthesis page to change the answer. Write a new synthesis at a new slug; set the old page's `superseded_by:` to point at the new one.
-4. **Vault-content-changing qmd operations are never agent-run.** `qmd collection add` (initial setup) and `qmd ingest <url>` (pulls external content) are user-run only; agent prints the commands and waits. Index-only operations `qmd update` and `qmd embed` are idempotent and don't change vault content — the agent runs these automatically (typically from the SessionStart hook). qmd install is agent-guided via the install-helper recipe (Phase 6) and user-executed by default; the user may opt the agent in to executing the install per session.
+4. **Vault-content-changing qmd operations are never agent-run.** `qmd collection add` (initial setup) and `qmd ingest <url>` (pulls external content) are user-run only; agent prints the commands and waits. Index-only operations `qmd update` and `qmd embed` are idempotent and don't change vault content — the agent runs these automatically (typically from the SessionStart hook). qmd install is agent-guided via the install-helper recipe (Phase 6) and user-executed by default; the user may opt the agent in to executing the install per session. The vault binds qmd to its own per-vault index via `INDEX_PATH` / `QMD_CONFIG_DIR` env vars in `.mcp.json` (committed); the agent never edits `.mcp.json` mid-session.
 5. **Topic-first folders, never type-first.** Page paths are `<topic>/<subtopic>/<slug>.md`, not `entities/<slug>.md`.
 6. **`.research/` is exclusively for deep-research output.** Not for working notes, scratchpads, drafts. A page being filled in over multiple sessions is a normal wiki page, not a `.research/` artifact.
 7. **External web sources are not copied into the vault as wiki pages.** When long-term grounding is needed, sources may be ingested into `raw/` as cleaned-up markdown via the defuddle skill. Synthesis pages cite ingested sources by `qmd://<vault-name>/raw/<slug>.md` and non-ingested sources by `https://...`. The vault stays portable and human-readable; `raw/` documents have minimal frontmatter (no `type:` field) so they're never confused with wiki pages.
@@ -235,7 +238,7 @@ The procedure has 9 phases. Each phase ends with at least one git commit (so the
 | Phase | Purpose | Mutates |
 |---|---|---|
 | 0 | Capture inputs | none |
-| 1 | Empty repo bootstrap | `<vault-root>/`, `git init`, `.gitignore`, `README.md`, `.research/.gitkeep`, `raw/.gitkeep`, `raw/README.md` |
+| 1 | Empty repo bootstrap + per-vault qmd config | `<vault-root>/`, `git init`, `.gitignore`, `README.md`, `.research/.gitkeep`, `raw/.gitkeep`, `raw/README.md`, `.qmd/index.yml`, `.mcp.json` |
 | 2 | Page type templates | `.templates/{entity,concept,synthesis}.md` |
 | 3 | Committed skills | `.claude/skills/{recall,wiki-research,update-vendors}/...` |
 | 4 | Pinned submodules (deep-research, obsidian-skills) | `.gitmodules`, `.claude/skills/{deep-research,obsidian-skills}/` |
@@ -334,6 +337,11 @@ Write `<vault-root>/.gitignore` with verbatim content:
 
 # Optional Obsidian local state — comment out if the user shares it across machines
 .obsidian/workspace*.json
+
+# Per-vault qmd index (regenerable from the wiki content)
+/.qmd/index.sqlite
+/.qmd/*.sqlite-wal
+/.qmd/*.sqlite-shm
 ```
 
 Note on `.research/`: artifacts are committed by default (the audit trail for synthesis pages references in-vault paths). To exclude `.research/` from git, add `.research/` here — but synthesis citations to deep-research artifacts will dangle on a fresh clone.
@@ -357,6 +365,8 @@ This is a curated markdown wiki. The vault's operating rules are in [`CLAUDE.md`
 - `.templates/` — frontmatter starters for entity / concept / synthesis pages.
 - `.claude/skills/` — first-party skills (`wiki-research`, `recall`, `update-vendors`) and the pinned submodules (`deep-research`, `obsidian-skills`).
 - `.claude/hooks/` — SessionStart hook for qmd freshness checks.
+- `.qmd/` — per-vault qmd config (`index.yml`) and SQLite index (`index.sqlite`, gitignored).
+- `.mcp.json` — Claude Code MCP config; binds the qmd MCP server to this vault's index.
 - `raw/` — ingested source documents (web articles, papers); indexed by qmd as the `raw` retrieval scope.
 - `.research/` — ephemeral deep-research artifacts (kept for traceability, not indexed).
 - `<topic>/<subtopic>/` — actual wiki pages, organized by domain.
@@ -424,13 +434,63 @@ No `type:` field — `raw/` documents are NOT wiki pages.
 `raw/` is indexed by qmd alongside the wiki content. Queries can scope to `wiki` (excludes `raw/`), `raw` (only `raw/`), or `hybrid` (both — default).
 ```
 
-### Task 1.6 — First commit
+### Task 1.6 — Scaffold per-vault qmd config
+
+- [ ] **Step 1: Create the .qmd/ directory and write .qmd/index.yml**
+
+```bash
+mkdir -p .qmd
+```
+
+Write `<vault-root>/.qmd/index.yml` verbatim (substituting `<vault-name>`):
+
+```yaml
+collections:
+  <vault-name>:
+    path: .
+    pattern: "**/*.md"
+    ignore:
+      - .qmd/**
+      - .research/**
+      - .claude/**
+      - .templates/**
+```
+
+- [ ] **Step 2: Write .mcp.json at the vault root**
+
+Write `<vault-root>/.mcp.json` verbatim (no substitutions; `${CLAUDE_PROJECT_DIR}` is expanded by Claude Code at MCP-server-spawn time):
+
+```json
+{
+  "mcpServers": {
+    "qmd": {
+      "command": "qmd",
+      "args": ["mcp"],
+      "env": {
+        "INDEX_PATH": "${CLAUDE_PROJECT_DIR:-.}/.qmd/index.sqlite",
+        "QMD_CONFIG_DIR": "${CLAUDE_PROJECT_DIR:-.}/.qmd"
+      }
+    }
+  }
+}
+```
+
+- [ ] **Step 3: Verify the files**
+
+```bash
+test -f .qmd/index.yml && echo "index.yml OK"
+test -f .mcp.json && echo ".mcp.json OK"
+grep -c 'CLAUDE_PROJECT_DIR' .mcp.json   # expected: 2
+grep -c '<vault-name>' .qmd/index.yml    # expected: 1 (after substitution)
+```
+
+### Task 1.7 — First commit
 
 - [ ] **Step 1: Stage and commit**
 
 ```bash
-git add .gitignore README.md .research/.gitkeep raw/.gitkeep raw/README.md
-git commit -m "scaffold: initialize <vault-name> repo (gitignore, README, .research, raw)"
+git add .gitignore README.md .research/.gitkeep raw/.gitkeep raw/README.md .qmd/index.yml .mcp.json
+git commit -m "scaffold: initialize <vault-name> repo (gitignore, README, .research, raw, qmd config)"
 git status
 ```
 
@@ -711,7 +771,7 @@ If missing, stop and tell the user:
 > ```
 
 Verify qmd availability per the vault `CLAUDE.md` retrieval-primitives section
-(run `qmd status` or `mcp__plugin_qmd_qmd__status`). On Case A or B, accept
+(run `qmd status` or `mcp__qmd__status`). On Case A or B, accept
 Read+Grep fallback for the rest of this run; surface the degraded mode once.
 
 Determine the vault name from `qmd status`'s collection list. The vault name
@@ -730,7 +790,7 @@ reasonable interpretation and proceed — the user can correct later.
 
 Run a hybrid query against the vault:
 
-- MCP preferred: `mcp__plugin_qmd_qmd__query` with
+- MCP preferred: `mcp__qmd__query` with
   `searches: [{type:'lex', query:'<terms>'}, {type:'vec', query:'<the question phrased naturally>'}]`
   and `intent: '<one-line description of why you're searching>'`.
 - CLI fallback: `qmd query --collection <vault-name> --json "<query>"`.
@@ -1006,10 +1066,12 @@ Detects upstream updates to vault dependencies and offers to apply them. The use
 
 ## Vendors covered
 
-- **qmd** (CLI tool) — installed via package manager.
+- **qmd** (CLI tool) — installed via package manager. **Minimum version:** post-`b775592` (`b77559223025cbcff3f992df0bf01147497c3bab`, 2026-05-09 — fixes MCP `--index` plumbing). Older versions silently break per-vault index isolation.
 - **Obsidian CLI** (CLI tool) — installed via package manager.
 - **deep-research** (git submodule at `.claude/skills/deep-research/`).
 - **obsidian-skills** (git submodule at `.claude/skills/obsidian-skills/`).
+
+**Minimum-version policy:** for any vendor with a documented floor (currently only qmd), the skill's per-dep verdict in Phase 4 marks an upgrade as **REQUIRED** (not optional) when the installed version is below the floor. The user can still skip, but the framework flags this as a known-broken state.
 
 ## Workflow
 
@@ -1065,6 +1127,17 @@ For deps that are up-to-date, just confirm:
 
 ```
 <name>: pinned <version> (up to date)
+```
+
+For deps below their minimum-version floor (see "Vendors covered" above), prefix the verdict with **REQUIRED** so the user knows the framework considers this a known-broken state:
+
+```
+qmd: <current-version> → <latest-version> (BELOW MINIMUM FLOOR — REQUIRED upgrade)
+   reason: per-vault index isolation broken without b775592 fix
+   summary:
+   <change summary>
+
+   update? [yes / show-full-diff / skip — note: skipping leaves the vault in a known-broken state]
 ```
 
 Wait for user response per dep.
@@ -1237,6 +1310,12 @@ LOG=".research/.session-start.log"
 mkdir -p "$(dirname "$LOG")" 2>/dev/null
 
 log_err() { printf '%s\n' "$*" >> "$LOG" 2>/dev/null; }
+
+# Bind subsequent qmd CLI invocations to this vault's per-vault index.
+# (The MCP server gets the same env via .mcp.json; this covers the hook's
+# own qmd status / qmd update / qmd embed calls.)
+export INDEX_PATH="$PWD/.qmd/index.sqlite"
+export QMD_CONFIG_DIR="$PWD/.qmd"
 
 # 1. qmd freshness check
 if ! command -v qmd >/dev/null 2>&1; then
@@ -1564,7 +1643,7 @@ vault mode.
 ## Retrieval primitives (qmd integration)
 
 Vault retrieval goes through the `tobi/qmd` Claude Code plugin's MCP tools:
-`mcp__plugin_qmd_qmd__query`, `get`, `multi_get`, `status`. CLI fallback is
+`mcp__qmd__query`, `get`, `multi_get`, `status`. CLI fallback is
 `qmd <command>` via Bash, with `--json` always.
 
 **Query selection** (intent → CLI form; MCP equivalents take the same params):
@@ -1584,25 +1663,42 @@ branch:
 - Case C — index stale → recommend `qmd update`; proceed either way.
 - Case D — fresh → silent.
 
-**Setup commands (user-run only):**
+**Per-vault index (this vault's qmd binding):**
+
+The qmd MCP server in this vault is bound to a per-vault index by `.mcp.json` at the vault root. Because `.mcp.json` declares a server named `qmd` and Claude Code's scope precedence is Project > User > Plugin, this entry shadows the marketplace plugin's qmd server. MCP tools are therefore exposed as `mcp__qmd__*` (not `mcp__plugin_qmd_qmd__*`). The `.mcp.json` env block sets two env vars when the MCP server spawns:
+
+- `INDEX_PATH=<vault-root>/.qmd/index.sqlite` — absolute path to this vault's SQLite index
+- `QMD_CONFIG_DIR=<vault-root>/.qmd` — directory qmd reads `index.yml` (per-collection config) from
+
+For manual CLI invocations (and the SessionStart hook), prefix the same env vars or rely on the hook's exports. Optional shell helper for ergonomics:
 
 ```bash
-qmd collection add . --name <vault-name> --mask '**/*.md'
-# After this, run `qmd status` and confirm the indexed file count matches
-# the count of `.md` files outside dotfolders (raw/ is included by design).
-# If dotfolder content leaks in, replace the single command above with one
-# `qmd collection add` per top-level topic folder + raw, all sharing
-# `--name <vault-name>`.
-qmd context add /                  "<identity-statement>"
-qmd context add qmd://<vault-name> "<identity-statement>"
-qmd embed
+qmd-vault() { INDEX_PATH="$PWD/.qmd/index.sqlite" QMD_CONFIG_DIR="$PWD/.qmd" qmd "$@"; }
+```
+
+…then `qmd-vault status`, `qmd-vault embed`, etc. The env-prefixed form below is canonical.
+
+**Setup commands (user-run only, env-prefixed for per-vault index):**
+
+```bash
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+  qmd collection add . --name <vault-name> --mask '**/*.md'
+# After this, run a status check and confirm the indexed file count matches
+# the count of `.md` files outside dotfolders (raw/ is included by design):
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd status
+# Initial context entries (root + collection-scoped, both with the identity statement):
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+  qmd context add /                  "<identity-statement>"
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+  qmd context add qmd://<vault-name> "<identity-statement>"
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd embed
 ```
 
 **Update commands (agent-run automatically from SessionStart hook, also user-runnable):**
 
 ```bash
-qmd update
-qmd embed   # only if many new files were added
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd update
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd embed   # only if many new files were added
 ```
 
 **Install commands (user-run by default; agent-runnable on per-session opt-in via the install-helper recipe).** The recipe is documented in Phase 6 of the runbook (this is reproduced here for runtime reference):
@@ -1616,9 +1712,9 @@ qmd embed   # only if many new files were added
 
 **Agent automation policy:**
 
-- **Always agent-callable:** `qmd query`, `qmd search`, `qmd get`, `qmd multi-get`, `qmd status`, `qmd update`, `qmd embed` (the last two are idempotent index ops; the SessionStart hook runs them automatically when stale).
+- **Always agent-callable** (with `INDEX_PATH` / `QMD_CONFIG_DIR` env from `.mcp.json` for MCP, or from the SessionStart hook for CLI): `qmd query`, `qmd search`, `qmd get`, `qmd multi-get`, `qmd status`, `qmd update`, `qmd embed` (the last two are idempotent index ops; the SessionStart hook runs them automatically when stale).
 - **Agent-callable on per-session opt-in:** qmd install (via install-helper recipe).
-- **Never agent-run:** `qmd collection add`, `qmd ingest <url>` (vault-scope-changing).
+- **Never agent-run:** `qmd collection add`, `qmd ingest <url>` (vault-scope-changing). The agent also never edits `.mcp.json` mid-session — that file is the per-vault index binding and is committed.
 
 **Fallback chain.** When qmd is unavailable, fall back for the rest of the
 session and surface "running on grep fallback" once:
@@ -1771,7 +1867,7 @@ Where `<list>` names the categories (page-types, subfolder-conventions, lint-rul
 
 The agent never auto-runs qmd's mutating ops. All commands in this phase are printed for the user to execute; the agent waits between steps.
 
-### Task 6.1 — Detect qmd state
+### Task 6.1 — Detect qmd state and version
 
 - [ ] **Step 1: Run the freshness check (read-only — agent runs this)**
 
@@ -1782,8 +1878,20 @@ qmd status 2>&1
 Branch on the result:
 
 - **Case A — `qmd: command not found`** → continue to Task 6.2 (install).
-- **Case B — `qmd status` runs but reports no collection matching `<vault-name>`** → skip to Task 6.3 (setup).
+- **Case B — `qmd status` runs but reports no collection matching `<vault-name>`** → continue to Step 2 (version-floor check), then Task 6.3 (setup).
 - **Case C — `qmd status` reports a collection matching `<vault-name>`** → unexpected for a fresh repo. Surface to the user: "A qmd collection named `<vault-name>` already exists from a previous setup. Skip qmd setup and proceed to Task 6.4 verification?" Wait for explicit confirmation.
+
+- [ ] **Step 2: Verify qmd version floor (Cases B and C)**
+
+The vault binds qmd to a per-vault index via `INDEX_PATH` in `.mcp.json`. Pre-`b775592` (commit `b77559223025cbcff3f992df0bf01147497c3bab`, 2026-05-09) qmd silently ignores `INDEX_PATH` for the MCP server and falls back to the global index — vault isolation breaks without a user-visible signal. Verify the installed qmd is at or above the floor:
+
+```bash
+qmd --version 2>&1
+```
+
+If the version is unambiguously older (e.g., a tagged release that predates the fix, or a build date earlier than 2026-05-09), surface the floor requirement and route to the install-helper (Task 6.2) for an upgrade. The user may opt to skip the upgrade for now, but the runbook flags it as required and the produced vault will not have per-vault MCP isolation until upgraded.
+
+If `qmd --version` doesn't include a parseable date or commit, the runbook can't auto-verify; surface this to the user and ask whether the install is recent enough (post-2026-05-09).
 
 ### Task 6.2 — Install qmd via the install-helper recipe (Case A only)
 
@@ -1871,20 +1979,23 @@ Expected: `qmd status` runs successfully. If still `command not found`, surface 
 
 - [ ] **Step 1: Print verbatim** (with `<vault-root>`, `<vault-name>`, `<identity-statement>` substituted):
 
-> Run these in `<vault-root>`:
+> Run these in `<vault-root>`. Each command is env-prefixed with `INDEX_PATH` and `QMD_CONFIG_DIR` so qmd writes to the per-vault index at `<vault-root>/.qmd/index.sqlite` (not the global default).
 >
 > ```bash
 > cd <vault-root>
 >
-> # Add the vault as a qmd collection
-> qmd collection add . --name <vault-name> --mask '**/*.md'
+> # Add the vault as a qmd collection (creates .qmd/index.sqlite)
+> INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+>   qmd collection add . --name <vault-name> --mask '**/*.md'
 >
 > # Initial context entries (root + collection-scoped, both with the identity statement)
-> qmd context add /                  "<identity-statement>"
-> qmd context add qmd://<vault-name> "<identity-statement>"
+> INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+>   qmd context add /                  "<identity-statement>"
+> INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+>   qmd context add qmd://<vault-name> "<identity-statement>"
 >
 > # Embed (downloads ~2.1GB GGUF models on first install; subsequent runs are fast)
-> qmd embed
+> INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd embed
 > ```
 
 - [ ] **Step 2: Wait for confirmation, then verify**
@@ -1892,13 +2003,17 @@ Expected: `qmd status` runs successfully. If still `command not found`, surface 
 After the user confirms:
 
 ```bash
-qmd status 2>&1
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd status 2>&1
 ```
 
 Verify:
 - A collection named `<vault-name>` is listed.
 - The collection's source path matches `<vault-root>`.
 - The indexed-file count is plausible for a fresh vault (~6–12 files: CLAUDE.md, README.md, three `.templates/*.md`, `raw/README.md`, plus the `wiki-research/playbook.md` and the three first-party SKILL.md files — depending on whether the dotfolder mask traversal includes them).
+- The SQLite file lives at `<vault-root>/.qmd/index.sqlite` (not at `~/.cache/qmd/index.sqlite`):
+  ```bash
+  test -f $(pwd)/.qmd/index.sqlite && echo "per-vault index OK" || echo "ERROR: index landed at the wrong path"
+  ```
 
 - [ ] **Step 3: Verify dotfolder exclusion**
 
@@ -1914,23 +2029,34 @@ If `qmd status` shows substantially more than ~10 files, dotfolders are leaking.
 
 If the count is plausible, proceed.
 
-### Task 6.4 — Verify the four success criteria
+### Task 6.4 — Verify the success criteria
 
-- [ ] **Step 1: `qmd status` returns the collection**
+- [ ] **Step 1: `qmd status` returns the collection (env-prefixed)**
 
 ```bash
-qmd status 2>&1 | grep -i '<vault-name>'
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd status 2>&1 | grep -i '<vault-name>'
 ```
 
 Expected: a non-empty match line.
 
-- [ ] **Step 2: A query against the empty(-ish) vault returns without erroring**
+- [ ] **Step 2: A query against the empty(-ish) vault returns without erroring (env-prefixed)**
 
 ```bash
-qmd query --collection <vault-name> --json "test" 2>&1
+INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd \
+  qmd query --collection <vault-name> --json "test" 2>&1
 ```
 
 Expected: valid JSON, no traceback, no `Error:` prefix on stderr. The result list may be empty or contain the framework files — both are fine.
+
+- [ ] **Step 2.5: Per-vault index file exists**
+
+```bash
+test -f $(pwd)/.qmd/index.sqlite && echo "per-vault index file OK"
+test -f $(pwd)/.qmd/index.yml    && echo "per-vault index config OK"
+test -f $(pwd)/.mcp.json         && echo ".mcp.json OK"
+```
+
+Expected: three OK lines.
 
 - [ ] **Step 3: The wiki-research and recall skills are listed**
 
@@ -1975,7 +2101,7 @@ Expected: 6 commits in this order (most recent first), or 7 if `git init` emitte
 3. `scaffold: pin deep-research and obsidian-skills as submodules`
 4. `scaffold: add wiki-research, recall, and update-vendors skills`
 5. `scaffold: add entity/concept/synthesis page templates`
-6. `scaffold: initialize <vault-name> repo (gitignore, README, .research, raw)`
+6. `scaffold: initialize <vault-name> repo (gitignore, README, .research, raw, qmd config)`
 
 If the count or order differs significantly, report to the user; some scaffolding step may have been merged or split.
 
@@ -2000,6 +2126,12 @@ Expected behavior, **stopping at Phase 5 (don't actually run deep-research)**:
 - Phase 0 (preflight) passes — deep-research submodule is populated, qmd is available.
 - Phase 1 accepts the query unmodified or asks at most one clarifying question.
 - Phase 2 runs the qmd query at the `wiki` scope, gets ~0 results (the vault has no domain content yet), routes to Phase 4.
+
+Additionally, before invoking wiki-research, verify the MCP server is bound to the per-vault index:
+
+> Ask the agent in the fresh Claude Code session: "Call the qmd MCP `status` tool and report the index path it shows."
+>
+> Expected: the agent reports an index path of the form `<vault-root>/.qmd/index.sqlite`. If the path is `~/.cache/qmd/index.sqlite` (or any non-vault path), the `${CLAUDE_PROJECT_DIR}` expansion in `.mcp.json` failed to resolve — surface to the user, fall back to writing absolute paths into `.mcp.json` (substituting `<vault-root>` directly), and re-run.
 - Phase 4 composes a seed brief acknowledging the vault has no existing evidence.
 - Phase 5 — **stop**. The brief should be visibly well-formed; the actual deep-research run is for the user's first real session.
 
@@ -2013,7 +2145,7 @@ Tell the user:
 
 > Vault `<vault-name>` is operational at `<vault-root>`.
 >
-> Six scaffolding commits are in place (seven on older git). The qmd collection is set up and embedded. Both submodules (deep-research, obsidian-skills) are pinned. The wiki-research, recall, and update-vendors skills are committed and discoverable. The SessionStart hook is active and the Obsidian CLI is installed.
+> Six scaffolding commits are in place (seven on older git). The qmd collection is set up and embedded against the per-vault index at `<vault-root>/.qmd/index.sqlite` (driven by the committed `.mcp.json` and `.qmd/index.yml`). Both submodules (deep-research, obsidian-skills) are pinned. The wiki-research, recall, and update-vendors skills are committed and discoverable. The SessionStart hook is active and the Obsidian CLI is installed.
 >
 > To write the first real page, either:
 > 1. Invoke `/wiki-research <your-question>` and follow the skill's loop end-to-end; or
@@ -2055,6 +2187,9 @@ When the user is ready, they invoke `/wiki-research <their first question>` and 
 | Deep-research or obsidian-skills submodule clone succeeds but expected `SKILL.md` is missing | 4.1, 4.2 | Check the submodule SHA; the upstream repo's HEAD may have moved the file. Pin to a known-good SHA. |
 | Index corruption | post-Phase 7 | Suggest `qmd update` or `qmd embed -f`; user runs. |
 | qmd MCP crash mid-session | post-Phase 7 | One-shot retry; on second failure, fall back to Read+Grep for remainder of session; surface "qmd MCP unavailable, on grep fallback" once. |
+| qmd < `b775592` silently uses global index | 6.1 | The version-floor check in 6.1 catches this; if missed, the Phase 7 MCP smoke test catches it via wrong index path. Recovery: bump qmd via install-helper (Task 6.2) or `/update-vendors`. |
+| First-time MCP approval prompt confuses user on fresh session | 7.x | Claude Code prompts to approve the project's `.mcp.json`. Documented behavior. Tell user to approve; the prompt happens once per project per machine. |
+| `${CLAUDE_PROJECT_DIR}` not expanded by older Claude Code | 7.x (smoke test) | Phase 7 smoke test catches this — the qmd MCP `status` tool reports the literal `${CLAUDE_PROJECT_DIR}` string (or `./.qmd/index.sqlite` after `:-` fallback) as the index path instead of the absolute vault path. Recovery: substitute `<vault-root>` directly into `.mcp.json` at scaffold time and re-commit. Surface the Claude Code version requirement: `${VAR}` expansion in `.mcp.json` env blocks is documented at https://code.claude.com/docs/en/mcp; if the user's Claude Code version predates this support, they need to upgrade. |
 | `/update-vendors` reports network errors | post-Phase 7 | User can skip remaining checks or retry; pinned versions remain in place. |
 
 ## Rollback (un-instantiating a vault)

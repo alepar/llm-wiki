@@ -113,8 +113,9 @@ Research conducted 2026-05-09 ahead of writing this repo's runbook. Captures wha
 
 **Trade-offs noted:**
 - One collection per vault — fine for this scope, doesn't cleanly support a multi-vault workspace if one ever materializes.
-- Index lives in `~/.cache/qmd/`, not in the vault repo — must be rebuilt after a fresh clone.
+- Index lives in the vault repo at `<vault-root>/.qmd/index.sqlite` (gitignored) — must be rebuilt after a fresh clone. (Originally lived in `~/.cache/qmd/`; per-vault layout adopted post-`b775592` upstream fix that made `INDEX_PATH` env work for the qmd MCP server.)
 - Mutating ops (`qmd ingest`, `qmd collection add`) are user-run only by policy (Invariant 4).
+- Hard floor on qmd version: post-`b775592` (commit `b77559223025cbcff3f992df0bf01147497c3bab`, 2026-05-09). Older versions silently fall back to the global index for MCP queries, breaking per-vault isolation.
 
 ## 8. 199-biotechnologies/claude-deep-research-skill (deep-research submodule)
 

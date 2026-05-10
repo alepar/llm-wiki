@@ -8,7 +8,7 @@ A self-contained git repo of markdown files (your vault), pre-wired with:
 
 - **Three core page types** (entity, concept, synthesis) plus optional domain-specific extensions.
 - **Topic-first folders** with placement rules.
-- **qmd hybrid retrieval** — BM25 + vector + LLM rerank — with three scopes (wiki / raw / hybrid).
+- **qmd hybrid retrieval** — BM25 + vector + LLM rerank — with three scopes (wiki / raw / hybrid). Per-vault index at `.qmd/index.sqlite` (no cross-vault contamination).
 - **Three committed first-party skills**: `wiki-research` (disciplined research loop), `recall` (raw qmd debug), `update-vendors` (vendor autoupdate workflow).
 - **Two pinned submodules**: `deep-research` (multi-source web research) and `obsidian-skills` (defuddle for ingest, obsidian-markdown for authoring).
 - **Auto-commit after user-approved writes** — git history is the audit trail.
