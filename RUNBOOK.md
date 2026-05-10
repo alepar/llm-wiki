@@ -1494,6 +1494,25 @@ inbound links should be rewritten to a canonical form instead.
 Use [label](qmd://<vault-name>/path/to/page.md) for explicit URL form.
 Use [label](https://...) for external links.
 
+## Diagrams
+
+For diagrams — flowcharts, sequence, state, ER, class — prefer ```mermaid
+blocks. Fall back to ASCII or Unicode line-drawing only when mermaid can't
+express the structure. Mermaid renders natively in Obsidian preview and on
+GitHub, stays diff-friendly, and remains editable by both humans and agents.
+
+Code blocks holding literal text — directory trees, command transcripts,
+sample frontmatter, file layouts — are not diagrams; leave those as plain
+code blocks.
+
+Example:
+
+```mermaid
+flowchart TD
+  A[Layer 1: Workflow prose] -->|consults| B[Layer 2: Retrieval primitives]
+  B -->|invokes| C[Layer 3: qmd]
+```
+
 ## Retrieval scopes
 
 Vault retrieval has three logical scopes:
