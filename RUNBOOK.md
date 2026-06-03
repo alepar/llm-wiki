@@ -197,17 +197,28 @@ The vault `CLAUDE.md` includes domain-specific examples after this table. The ru
 
 Aliases on entity pages are for **true synonyms only** — acronyms, alternate names, foreign phrasings (e.g., "ZN6" for the BRZ chassis page; "GPT-4" for the OpenAI o1-preview entity if the page is canonically titled differently). Do NOT add aliases that are just phrasing variants of the H1 or filename. If a target page accumulates more than ~3 aliases, prefer rewriting inbound links to a canonical form.
 
-## II.6 Synthesis supersession
+## II.6 Claim-level supersession
 
-To update a synthesis answer:
+Facts are never destroyed or reversed in place. To change what a page asserts, **supersede the claim** — uniform across entity, concept, and synthesis pages:
 
-1. Write a new synthesis page with the updated answer at a new slug.
-2. Set the old page's `superseded_by:` to the new page's `qmd://<vault-name>/<path>`.
-3. Mention the supersession in the new page's body ("supersedes [[old-slug]] — what changed: …").
+1. Write the new claim as a normal bullet + anchor + `claims:` entry in the live section (`## Facts`, or a synthesis's answer body).
+2. Set the old claim's `superseded_by:` to the successor's pointer — the bare anchor id (`c-<slug>`) for a same-page successor, or `qmd://<vault-name>/<path>#c-<slug>` for a cross-page one (e.g. synthesis → synthesis).
+3. Move the old bullet into the page's `## Superseded` section: strike it through and add a one-line reason and pointer.
 
-Synthesis history stays queryable; no silent semantic drift.
+```markdown
+## Facts
+- Uses DynamoDB for the primary store ^c-db-engine
 
-Entity and concept pages, by contrast, are freely editable in place. Bump `date_updated` on every meaningful edit.
+## Superseded
+- ~~Uses Postgres for the primary store~~ ^c-db-engine-old
+  (superseded by ^c-db-engine, 2026-06-03 — migrated off RDS, see ADR-014)
+```
+
+Live sections (`## Facts`, synthesis answer body) show only current truth; superseded claims stay in-page and remain qmd-queryable, so "what did we believe, when, and why did it change" is preserved without forking pages or relying on git archaeology.
+
+**All three page types are freely editable** for corrections, additions, and wording fixes — bump `date_updated` on every meaningful edit. What is *not* allowed is silently reversing a fact's meaning: a material answer change is a supersession, not an in-place edit. Synthesis pages are no longer write-once; a synthesis's answer is one or more conclusion-claims that supersede the same way. A synthesis may additionally be **wholesale-replaced** by pointing its page-level `superseded_by:` (II.2) at a newer synthesis; use claim-level supersession for finer-grained drift within a living synthesis. (`question`, `answered_at`, and the 180-day staleness rule are unchanged.)
+
+**Forward-only migration.** These rules govern newly-instantiated vaults and all new writes in existing vaults. Old free-text bullets without anchors remain valid un-provenanced notes (II.2); no bulk retrofit is required or performed. Pages upgrade to claims opportunistically when next edited.
 
 ## II.7 Extending with new page types (optional, per-domain)
 
