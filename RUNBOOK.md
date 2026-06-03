@@ -766,8 +766,14 @@ When weighing evidence:
 4. **Fresh web research** — useful for filling gaps and freshness checks, but
    always cross-checked against the above.
 
-Never silent-edit an existing page. Every write requires explicit user
-approval. Synthesis pages are write-once: never edit; supersede.
+Within a page, weigh **live claims** only — skip any claim whose `superseded_by:`
+is not null. Un-anchored bullets are un-provenanced notes; treat them as
+lower-trust than provenanced claims.
+
+Never silent-edit an existing page. Every write requires explicit user approval.
+Facts are claims: never reverse a fact in place — supersede it (claim-level,
+across entity/concept/synthesis alike; see the vault `CLAUDE.md` and RUNBOOK
+II.6).
 
 ## Default mode
 
@@ -779,8 +785,10 @@ The full phase-by-phase procedure lives in `playbook.md`. Read it before
 starting. High-level:
 
 1. Receive query (clarify if vague — at most one question).
-2. Run `qmd query` (MCP preferred, CLI fallback) and bucket results by
-   frontmatter `type:` into the trust tiers above.
+2. Retrieve + trust-rank via the **wiki-consult** read core (`.claude/skills/
+   wiki-consult/SKILL.md`, "Procedure"): one hybrid `qmd query`, bucketed by
+   frontmatter `type:` into the trust tiers above, claims resolved, superseded
+   claims skipped. This is the single retrieval path — do not reimplement it.
 3. **Coverage check**: skip web research only if a non-stale synthesis page
    directly answers the question. Otherwise continue.
 4. Build a seed brief for `deep-research` containing the question, vault
