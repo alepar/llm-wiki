@@ -138,6 +138,39 @@ sources:
 
 The synthesis frontmatter is contractual: the lint pass (Part III Phase 5) checks all five required fields are present and well-formed, and `superseded_by:` resolves to a real synthesis page in the vault when set.
 
+### Claims (all page types)
+
+Every *provenanced fact* on an entity, concept, or synthesis page is a **claim**: a body bullet carrying an Obsidian block anchor (`^c-<slug>`), joined to a `claims:` frontmatter map keyed by that same anchor. The frontmatter holds metadata only; the body bullet is the single source of truth for the claim's wording (no text-mirror — keeps it DRY; lint enforces the join). A page with no provenanced facts yet carries an empty map: `claims: {}`.
+
+```yaml
+claims:
+  c-db-engine:
+    sources:                                 # per-fact provenance — never empty
+      - https://internal-wiki/adr-014
+      - qmd://<vault-name>/raw/migration-postmortem.md
+    by: wiki-research                         # human | wiki-research | deep-research | import
+    asserted_at: 2026-06-03                   # YYYY-MM-DD
+    confidence: high                          # low | medium | high
+    superseded_by: null                       # null | <anchor-id> | qmd://<vault-name>/<path>#<anchor-id>
+```
+
+```markdown
+## Facts
+- Uses DynamoDB for the primary store ^c-db-engine
+```
+
+**Anchor / key / pointer convention.** The body bullet carries the anchor *with* its caret (`^c-db-engine`). The `claims:` map key and the `superseded_by:` same-page pointer use the bare anchor id *without* the caret (`c-db-engine`). A cross-page pointer is `qmd://<vault-name>/<path>#c-<slug>`. Lint joins key ↔ body anchor by stripping the leading `^`.
+
+**Field contract** (every claim entry has all five):
+
+- `sources` — non-empty list. `qmd://<vault-name>/<path>` for in-vault pages and `raw/` documents; `https://...` for non-ingested external sources.
+- `by` — write-identity, one of `human | wiki-research | deep-research | import`. When `wiki-research` writes a fact grounded in a deep-research run, `by:` is `wiki-research` and the deep-research evidence appears in `sources:`. Direct human edits are `human`.
+- `asserted_at` — the date the claim was asserted (`YYYY-MM-DD`).
+- `confidence` — `low | medium | high`.
+- `superseded_by` — `null` while the claim is live; otherwise the successor's bare anchor id (same-page) or `qmd://<vault-name>/<path>#c-<slug>` (cross-page).
+
+**Graceful degradation.** A body bullet with no `^anchor` (and thus no `claims:` entry) is a valid **un-provenanced note**, not a lint error — it simply carries no provenance and reads as lower-trust in consult output (II.8). Existing vaults' free-text bullets remain valid, and a page lacking the `claims:` key altogether is treated as `claims: {}`. Pages upgrade to claims opportunistically when next edited (forward-only migration — see II.6).
+
 ## II.3 Wikilinks
 
 Use `[[name]]` for vault-internal references. Resolution is **case-insensitive** and treats spaces, hyphens, and underscores as equivalent — `[[DIY string alignment procedure]]` resolves to `diy-string-alignment-procedure.md`. This matches Obsidian's documented behavior; users opening the vault as an Obsidian vault get free preview.
