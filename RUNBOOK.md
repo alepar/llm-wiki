@@ -78,7 +78,7 @@ These are framework-invariant. The executor must not relax them based on perceiv
 
 1. **Three core page types: `entity`, `concept`, `synthesis`.** Domains may add additional types alongside these, but never in place of them.
 2. **Page type lives in frontmatter, never folder path.** No `entities/`, `concepts/`, or `synthesis/` top-level folders.
-3. **Synthesis pages are write-once.** Never edit an existing synthesis page to change the answer. Write a new synthesis at a new slug; set the old page's `superseded_by:` to point at the new one.
+3. **Facts are claims; supersession is claim-level and non-destructive.** Every provenanced fact on an entity, concept, or synthesis page is a *claim*: a block-anchored body bullet (`^c-…`) backed by a `claims:` frontmatter entry (Part II.2). A claim is never edited to reverse its meaning and never deleted — it is *superseded* (Part II.6): a new claim is written and the old claim's `superseded_by:` is pointed at it. Synthesis pages are **no longer write-once** — their answers are conclusion-claims that supersede the same way (a synthesis may also be wholesale-replaced via its page-level `superseded_by:`). Un-anchored body bullets are valid un-provenanced notes, not claims.
 4. **Vault-content-changing qmd operations are never agent-run.** `qmd collection add` (initial setup) and `qmd ingest <url>` (pulls external content) are user-run only; agent prints the commands and waits. Index-only operations `qmd update` and `qmd embed` are idempotent and don't change vault content — the agent runs these automatically (typically from the SessionStart hook). qmd install is agent-guided via the install-helper recipe (Phase 6) and user-executed by default; the user may opt the agent in to executing the install per session. The vault binds qmd to its own per-vault index via `INDEX_PATH` / `QMD_CONFIG_DIR` env vars in `.mcp.json` (committed); the agent never edits `.mcp.json` mid-session.
 5. **Topic-first folders, never type-first.** Page paths are `<topic>/<subtopic>/<slug>.md`, not `entities/<slug>.md`.
 6. **`.research/` is exclusively for deep-research output.** Not for working notes, scratchpads, drafts. A page being filled in over multiple sessions is a normal wiki page, not a `.research/` artifact.
@@ -94,9 +94,9 @@ These are framework-invariant. The executor must not relax them based on perceiv
 
 | Type | When to use | Required frontmatter |
 |---|---|---|
-| `entity` | A specific proper noun: a tool, a person, an organization, a model, a product, a dataset, a place. | `type`, `kind`, `date_updated` |
-| `concept` | A *kind of thing*: an abstraction, a technique, a category, a methodology. | `type`, `date_updated` |
-| `synthesis` | An answer to a specific question, citing other pages and external sources. **Write-once.** | `type`, `question`, `answered_at`, `superseded_by`, `sources`, `date_updated` |
+| `entity` | A specific proper noun: a tool, a person, an organization, a model, a product, a dataset, a place. | `type`, `kind`, `claims`, `date_updated` |
+| `concept` | A *kind of thing*: an abstraction, a technique, a category, a methodology. | `type`, `claims`, `date_updated` |
+| `synthesis` | An answer to a specific question, citing other pages and external sources. Freely editable; answers are conclusion-claims (supersede, don't reverse-in-place). | `type`, `question`, `answered_at`, `superseded_by`, `sources`, `claims`, `date_updated` |
 
 Heuristic: if the subject is a single proper noun, prefer entity. If it's a kind of thing, prefer concept. **When unsure, prefer concept.**
 
