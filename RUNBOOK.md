@@ -243,7 +243,7 @@ Vault retrieval has three logical scopes:
 | `raw` | source documents under `raw/` (no `type:` field; minimal frontmatter) | Citing primary sources; finding original quotes |
 | `hybrid` | both | Default for general questions; fallback when scope is unclear |
 
-Implementation: scopes are realized via qmd path filters. Consult `qmd query --help` for current parameter names; the vault `CLAUDE.md` retrieval-primitives section documents the working syntax. The wiki-research skill scopes phase-2 retrieval per its playbook. The recall skill exposes scope as a flag for debugging.
+Implementation: scopes are realized via qmd path filters. Consult `qmd query --help` for current parameter names; the vault `CLAUDE.md` retrieval-primitives section documents the working syntax. The wiki-consult skill uses `hybrid` scope — curated claims are presented as *the answer*, raw-doc hits as *supporting evidence* — and is the shared retrieval core that wiki-research's phase-2 delegates to. The recall skill exposes scope as a flag for debugging.
 
 ## II.9 The `raw/` folder
 
@@ -284,7 +284,7 @@ The procedure has 9 phases. Each phase ends with at least one git commit (so the
 | 0 | Capture inputs | none |
 | 1 | Empty repo bootstrap + per-vault qmd config | `<vault-root>/`, `git init`, `.gitignore`, `README.md`, `.research/.gitkeep`, `raw/.gitkeep`, `raw/README.md`, `.qmd/index.yml`, `.mcp.json` |
 | 2 | Page type templates | `.templates/{entity,concept,synthesis}.md` |
-| 3 | Committed skills | `.claude/skills/{recall,wiki-research,update-vendors}/...` |
+| 3 | Committed skills | `.claude/skills/{recall,wiki-consult,wiki-research,update-vendors}/...` |
 | 4 | Pinned submodules (deep-research, obsidian-skills) | `.gitmodules`, `.claude/skills/{deep-research,obsidian-skills}/` |
 | 4.5 | Obsidian CLI + SessionStart hook | `.claude/hooks/session-start.sh`, `.claude/settings.json` |
 | 5 | Vault `CLAUDE.md` | `CLAUDE.md` (+ optional domain extensions) |
@@ -1240,7 +1240,110 @@ This silences the SessionStart weekly nudge until 7 days have passed.
 - **Install-helper fails** for a CLI update: surface the upstream error; old version remains in place.
 ````
 
-### Task 3.5 — Commit skills
+### Task 3.5 — `.claude/skills/wiki-consult/SKILL.md`
+
+- [ ] **Step 1: Create directory and file**
+
+```bash
+mkdir -p .claude/skills/wiki-consult
+```
+
+Write `<vault-root>/.claude/skills/wiki-consult/SKILL.md` verbatim:
+
+````markdown
+---
+name: wiki-consult
+description: Use mid-task when you need to know what the vault already knows about something — a fast, read-only, trust-ranked, provenance-annotated answer drawn only from existing vault pages and raw sources. Never writes, never supersedes, never hits the web. For research that fills gaps and writes pages use wiki-research; for raw qmd debugging use recall.
+---
+
+# /wiki-consult — read-only vault consult
+
+Answers "what does the vault already know about X?" from existing content only.
+This is the vault's shared **read core**: wiki-research delegates its retrieval
+and trust-ranking phase here, then wraps it with web research and write
+capability. wiki-consult itself never writes, never supersedes, never ingests,
+and never hits the web.
+
+## Which read path
+
+- **wiki-consult** — answer-shaped, trust-ranked, provenance-aware. The default
+  for "does the vault already cover this?"
+- **recall** — raw qmd query for debugging retrieval and scores. No ranking,
+  no provenance synthesis.
+- **wiki-research** — when the answer needs fresh web research and new pages
+  written. wiki-consult *suggests* escalating here on a miss; it never runs it.
+
+## Properties
+
+- **Read-only.** No writes, no supersession, no ingest, no `qmd update`/`embed`,
+  no web.
+- **Manual.** Invoked as `/wiki-consult <question>`. No auto-trigger.
+- **Hybrid scope.** Queries curated pages *and* `raw/`. Curated claims are the
+  answer; raw-doc hits are supporting evidence (so a topic with no claim yet
+  still returns something).
+- **Trust-ranked.** synthesis > entity/concept > raw (the vault trust
+  hierarchy). Superseded claims (`superseded_by:` not null) are skipped.
+- **Freshness-aware.** Uses the vault's 180-day threshold for both synthesis
+  `answered_at` and claim `asserted_at`. Stale items are warned, never hidden.
+- **Contradiction-aware.** If two live claims conflict, surface both with their
+  provenance and flag — do not resolve.
+- **Gap-reporting.** On a miss, stale answer, or contradiction, suggest
+  `/wiki-research` but never run it.
+
+## Procedure (the shared retrieval + trust-ranking core)
+
+wiki-research's playbook Phase 2 delegates to these six steps; keep them here as
+the single retrieval path.
+
+1. **Retrieve (hybrid).** Run a hybrid qmd query — MCP `mcp__qmd__query`
+   preferred (`searches: [{type:'lex', query:'<terms>'}, {type:'vec',
+   query:'<question phrased naturally>'}]`), CLI fallback `qmd query
+   --collection <vault-name> --json "<query>"` — over the whole vault. On qmd
+   unavailable, fall back to Read+Grep and surface the degraded mode once.
+2. **Bucket by trust tier** (read each hit's frontmatter `type:`):
+   - Tier 1 — `type: synthesis`, page-level `superseded_by: null`.
+   - Tier 2 — `type: entity` or `type: concept`.
+   - Tier 3 — `raw/` documents (supporting evidence only).
+3. **Resolve claims.** For tier 1–2 hits, read the full file. Read each fact
+   from its `## Facts` (or synthesis answer) bullet and join to its `claims:`
+   entry by anchor (strip the leading `^`). **Skip any claim whose
+   `superseded_by:` is not null.** Un-anchored bullets are un-provenanced
+   notes — include them but mark them lower-trust (no confidence/source/date).
+4. **Freshness.** For each surfaced synthesis and claim, compute age from
+   `answered_at` / `asserted_at`. If `(today - date) > 180` days, prefix the
+   line with `⚠` and an age note. Never drop it.
+5. **Contradiction.** If two live claims assert conflicting values for the same
+   fact, surface both with provenance and a `⚠ Conflict` flag. Do not resolve.
+6. **Report.** Present curated claims as the answer (confidence, asserted date,
+   `by`, source, `[[page]]`), raw hits as supporting evidence, a gaps line for
+   anything with no vault entry, then the escalation prompt if there were any
+   gaps, stale items, or conflicts.
+
+## Output shape (illustrative)
+
+```
+From the vault:
+• Primary store: DynamoDB — confidence: high, asserted 2026-06-03 by wiki-research
+  source: ADR-014  [[acme-infra]]
+• ⚠ Auth: Auth0 — confidence: medium, asserted 2025-08-01 (10mo old — may be stale)  [[acme-auth]]
+• ⚠ Conflict: [[acme-infra]] says us-east-1, [[acme-dr-plan]] says us-west-2 — both live
+
+No vault entry for: rate-limiting strategy.
+→ Gaps/stale found. Escalate with /wiki-research?
+```
+
+## Hard rules
+
+- Never write, edit, supersede, ingest, or run `qmd update` / `qmd embed`.
+- Never hit the web. If the vault can't answer, say so and suggest
+  `/wiki-research`.
+- Skip superseded claims from the answer — they are history, not current truth.
+  To inspect history, the human can use `/recall`.
+- Relationship to `recall` is unchanged: `recall` is the raw qmd query;
+  `wiki-consult` is the answer-shaped, trust-ranked read path. No merge.
+````
+
+### Task 3.6 — Commit skills
 
 - [ ] **Step 1: Stage and commit**
 
