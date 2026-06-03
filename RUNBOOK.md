@@ -1,6 +1,6 @@
 # LLM-Wiki Vault Instantiation Runbook
 
-> A single self-sufficient procedure for spinning up a new markdown wiki vault, designed to be fed verbatim to a fresh Claude Code session along with a chosen domain. The session collects three inputs (vault name, identity statement, target directory), then mechanically scaffolds a git-tracked vault with qmd hybrid retrieval, a pinned deep-research submodule, and committed `wiki-research` + `recall` slash-command skills.
+> A single self-sufficient procedure for spinning up a new markdown wiki vault, designed to be fed verbatim to a fresh Claude Code session along with a chosen domain. The session collects three inputs (vault name, identity statement, target directory), then mechanically scaffolds a git-tracked vault with qmd hybrid retrieval, a pinned deep-research submodule, and committed `wiki-research`, `wiki-consult`, and `recall` slash-command skills.
 >
 > **No other file needs to be consulted.** Every literal template, every command, every invariant is reproduced inline. The companion design spec (`docs/superpowers/specs/2026-05-09-llm-wiki-meta-design.md`) contains rationale and alternatives but is not required for execution.
 
@@ -1372,7 +1372,7 @@ No vault entry for: rate-limiting strategy.
 
 ```bash
 git add .claude/skills/
-git commit -m "scaffold: add wiki-research, recall, and update-vendors skills"
+git commit -m "scaffold: add wiki-research, wiki-consult, recall, and update-vendors skills"
 ```
 
 ---
@@ -2398,7 +2398,7 @@ Expected: 6 commits in this order (most recent first), or 7 if `git init` emitte
 1. `scaffold: add vault CLAUDE.md ...`
 2. `scaffold: add SessionStart hook for qmd freshness + vendor-update nudge`
 3. `scaffold: pin deep-research and obsidian-skills as submodules`
-4. `scaffold: add wiki-research, recall, and update-vendors skills`
+4. `scaffold: add wiki-research, wiki-consult, recall, and update-vendors skills`
 5. `scaffold: add entity/concept/synthesis page templates`
 6. `scaffold: initialize <vault-name> repo (gitignore, README, .research, raw, qmd config)`
 
@@ -2444,7 +2444,7 @@ Tell the user:
 
 > Vault `<vault-name>` is operational at `<vault-root>`.
 >
-> Six scaffolding commits are in place (seven on older git). The qmd collection is set up and embedded against the per-vault index at `<vault-root>/.qmd/index.sqlite` (driven by the committed `.mcp.json` and `.qmd/index.yml`). Both submodules (deep-research, obsidian-skills) are pinned. The wiki-research, recall, and update-vendors skills are committed and discoverable. The SessionStart hook is active and the Obsidian CLI is installed.
+> Six scaffolding commits are in place (seven on older git). The qmd collection is set up and embedded against the per-vault index at `<vault-root>/.qmd/index.sqlite` (driven by the committed `.mcp.json` and `.qmd/index.yml`). Both submodules (deep-research, obsidian-skills) are pinned. The wiki-research, wiki-consult, recall, and update-vendors skills are committed and discoverable. The SessionStart hook is active and the Obsidian CLI is installed.
 >
 > To write the first real page, either:
 > 1. Invoke `/wiki-research <your-question>` and follow the skill's loop end-to-end; or
