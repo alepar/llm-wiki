@@ -863,28 +863,25 @@ If vague ("research X" with no scope, or a topic that could mean several
 things), ask **at most one** clarifying question. Otherwise commit to a
 reasonable interpretation and proceed — the user can correct later.
 
-## Phase 2 — qmd-first retrieval
+## Phase 2 — Retrieval (via the wiki-consult core)
 
-Run a hybrid query against the vault:
-
-- MCP preferred: `mcp__qmd__query` with
-  `searches: [{type:'lex', query:'<terms>'}, {type:'vec', query:'<the question phrased naturally>'}]`
-  and `intent: '<one-line description of why you're searching>'`.
-- CLI fallback: `qmd query --collection <vault-name> --json "<query>"`.
-
-Bucket results by frontmatter `type:` (read the frontmatter of each hit; the
-chunk text alone is not enough):
+Retrieval and trust-ranking are the **shared wiki-consult read core** — do not
+reimplement them. Run steps 1–5 of `.claude/skills/wiki-consult/SKILL.md`
+("Procedure"): one hybrid `qmd query` (MCP `mcp__qmd__query` preferred, CLI
+`qmd query --collection <vault-name> --json` fallback), bucketed by frontmatter
+`type:` into the trust tiers, with full-file reads for tier 1–2, claims
+resolved by anchor, superseded claims skipped, and freshness/contradiction
+flags computed.
 
 | Tier | Bucket | Trust |
 |------|-----|-------|
-| 1 | `type: synthesis`, `superseded_by: null` | highest |
+| 1 | `type: synthesis`, page-level `superseded_by: null` | highest |
 | 2 | `type: entity` or `type: concept` | high |
-| 3 | external URL hits (qmd-ingested web sources) | medium |
+| 3 | `raw/` documents / external URL hits | medium |
 
-For tier 1 and tier 2 results, read the **full file** from disk (use `qmd get
-<path>` or `Read`). Read frontmatter and body. For tier 3, the chunk text in
-the search result is enough at this stage — read full pages later if a claim
-depends on context not in the chunk.
+What wiki-research does *beyond* the read core: carry the bucketed evidence and
+flagged gaps forward into the coverage check (Phase 3) and seed brief (Phase 4),
+and — unlike read-only consult — continue into web research and writes.
 
 If the query returns no results, treat it as a green-field topic and skip
 directly to phase 4.
@@ -1016,13 +1013,16 @@ For each contradiction, present:
 Ask the user how to resolve each one. Outcomes per item:
 
 - **Trust vault** — drop the web claim from the synthesis.
-- **Trust web** — supersede the affected synthesis page (write a new one,
-  set old `superseded_by:`) or update the affected entity/concept page (with
-  diff approval; phase 7).
-- **Mark uncertain** — capture in synthesis under `## Open questions`; on
-  the affected concept page, lower `confidence:` to `low` and note the
+- **Trust web** — supersede the affected claim (claim-level, II.6): write the
+  corrected claim with its `claims:` entry, point the old claim's
+  `superseded_by:` at it, and move the old bullet to `## Superseded` (phase 7,
+  with diff approval). Applies to entity, concept, and synthesis claims alike.
+- **Mark uncertain** — capture in the synthesis under `## Open questions`; on
+  the affected claim, lower its `confidence:` to `low` and note the
   disagreement.
-- **Supersede** — only valid for synthesis pages; never directly edit them.
+- **Supersede** — claim-level supersession (II.6) is the mechanism for every
+  page type. A whole synthesis may also be wholesale-replaced via its
+  page-level `superseded_by:`.
 
 Apply each resolution in phase 7. Do not proceed until every contradiction
 has a resolution.
@@ -1036,8 +1036,13 @@ Strict order:
 For each entity/concept page touched by the research:
 
 1. Read the current file.
-2. Compose the proposed edit (typically: refine description, add a property,
-   link a new related concept, refresh `date_updated`).
+2. Compose the proposed edit. For each **new provenanced fact**, add an
+   anchored bullet under `## Facts` (`... ^c-<slug>`) and a matching `claims:`
+   entry: `sources` (the web/vault evidence), `by: wiki-research`,
+   `asserted_at: <today>`, `confidence`, `superseded_by: null`. To **change an
+   existing fact**, follow the II.6 supersession flow — never overwrite the old
+   bullet. Non-fact edits (refine prose, add a property, link a related
+   concept) stay free-text.
 3. Show the unified diff to the user.
 4. On approval, write the file and update `date_updated` to today.
 
@@ -1068,9 +1073,19 @@ superseded_by: null
 sources:
   - qmd://<vault-name>/<path>      # for each vault page cited
   - https://...                    # for each web source cited
+claims:
+  c-conclusion:
+    sources: [ ... ]               # the evidence behind the bottom-line answer
+    by: wiki-research
+    asserted_at: YYYY-MM-DD
+    confidence: high               # low | medium | high
+    superseded_by: null
 date_updated: YYYY-MM-DD
 ---
 ```
+
+Express the bottom-line answer as one or more anchored conclusion-claims, e.g.
+`- <the answer> ^c-conclusion`, each with a matching `claims:` entry as above.
 
 Body structure:
 
