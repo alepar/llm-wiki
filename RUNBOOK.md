@@ -2035,9 +2035,15 @@ Walk these passes:
 
 5. **Supersession integrity.** Every `superseded_by:` resolves to a real `type: synthesis` file; chains don't loop.
 
+6. **Claim integrity.** For every page that carries claims:
+   - **Bidirectional join.** Every `claims:` key has a matching `^<key>` anchor in the body, and every `^c-…` anchor in the body has a `claims:` entry. (Un-anchored bullets are exempt — they are un-provenanced notes. A page lacking the `claims:` key is treated as `claims: {}`.)
+   - **Required fields present.** Every claim entry has `sources` (non-empty), `by`, `asserted_at`, `confidence`, and `superseded_by`.
+   - **`superseded_by` resolves.** When not `null`, it points to a real anchor — a `claims:` key on the same page, or a valid `qmd://<vault-name>/<path>#c-<slug>` cross-page target.
+   - **Controlled vocabularies.** `by` ∈ {human, wiki-research, deep-research, import}; `confidence` ∈ {low, medium, high}.
+
 Group findings by severity:
-- **Hard** (frontmatter missing required fields, supersession cycle, `obsidian unresolved` reports a broken non-`raw/` link) → block commit unless user overrides.
-- **Soft** (orphans, stale syntheses) → surface; user decides.
+- **Hard** (frontmatter missing required fields, supersession cycle, broken anchor/claim join, claim entry missing a required field, `superseded_by` that doesn't resolve, out-of-vocabulary `by`/`confidence`, `obsidian unresolved` reports a broken non-`raw/` link) → block commit unless user overrides.
+- **Soft** (orphans, stale syntheses, claims older than 180 days by `asserted_at`) → surface; user decides.
 - **Informational** (entity/concept staleness ages) → list for awareness.
 
 ## Failure modes (summary)
