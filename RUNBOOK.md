@@ -561,6 +561,7 @@ type: entity
 kind: tool                 # person | org | tool | model | repo | dataset | product | place | <other>
 aliases: []
 homepage:
+claims: {}                 # map of ^c-<slug> anchor → {sources, by, asserted_at, confidence, superseded_by}
 date_updated: YYYY-MM-DD
 ---
 
@@ -572,7 +573,15 @@ One-paragraph description.
 - Producer: [[<Org>]]
 - ...
 
+## Facts
+<!-- Each provenanced fact is an anchored bullet with a matching claims: entry. Example:
+- Uses DynamoDB for the primary store ^c-db-engine
+Un-anchored bullets are valid un-provenanced notes. -->
+
 ## Notes
+
+## Superseded
+<!-- Struck-through claims moved here when superseded (see II.6). Empty until needed. -->
 ```
 
 ### Task 2.2 — `.templates/concept.md`
@@ -584,8 +593,9 @@ Write `<vault-root>/.templates/concept.md` verbatim:
 ```markdown
 ---
 type: concept
-confidence: medium         # low | medium | high
+confidence: medium         # low | medium | high  (page-level default; per-claim confidence lives in claims:)
 related: []
+claims: {}                 # map of ^c-<slug> anchor → {sources, by, asserted_at, confidence, superseded_by}
 date_updated: YYYY-MM-DD
 ---
 
@@ -594,6 +604,13 @@ date_updated: YYYY-MM-DD
 One-paragraph definition.
 
 ## Details
+
+## Facts
+<!-- Each provenanced fact is an anchored bullet with a matching claims: entry.
+Un-anchored bullets are valid un-provenanced notes. -->
+
+## Superseded
+<!-- Struck-through claims moved here when superseded (see II.6). Empty until needed. -->
 ```
 
 ### Task 2.3 — `.templates/synthesis.md`
@@ -607,14 +624,18 @@ Write `<vault-root>/.templates/synthesis.md` verbatim:
 type: synthesis
 question: "<the question, verbatim>"
 answered_at: YYYY-MM-DD
-superseded_by: null
+superseded_by: null        # page-level: set to qmd://<vault-name>/<path> if wholesale-replaced
 sources: []
+claims: {}                 # conclusion-claims: ^c-<slug> anchor → {sources, by, asserted_at, confidence, superseded_by}
 date_updated: YYYY-MM-DD
 ---
 
 # <The question>
 
-Short answer first (1–3 sentences). State the bottom line directly.
+Short answer first (1–3 sentences). State the bottom line directly. Express each
+load-bearing conclusion as an anchored claim with a matching claims: entry, e.g.:
+
+- The best ratio is 10:1 ^c-conclusion
 
 ## Reasoning
 
@@ -625,6 +646,9 @@ reference.>
 ## Open questions
 
 <Anything not resolved.>
+
+## Superseded
+<!-- Struck-through conclusion-claims moved here when superseded (see II.6). Empty until needed. -->
 
 ## Detailed report
 
