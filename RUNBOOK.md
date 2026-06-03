@@ -1632,7 +1632,7 @@ folder appears when its first page does.
 - `raw/`                    — ingested source documents (web articles, papers); minimal
                               frontmatter; indexed by qmd as the `raw` retrieval scope
 - `.templates/`             — frontmatter templates (entity, concept, synthesis)
-- `.claude/skills/`         — first-party skills (wiki-research, recall, update-vendors)
+- `.claude/skills/`         — first-party skills (wiki-research, wiki-consult, recall, update-vendors)
                               and pinned submodules (deep-research, obsidian-skills)
 - `.claude/hooks/`          — SessionStart hook for qmd freshness
 - `.research/`              — ephemeral deep-research artifacts (NOT indexed)
@@ -1672,6 +1672,41 @@ Every page MUST have:
 
 Entity pages also require:    kind:
 Synthesis pages also require: question:, answered_at:, superseded_by:, sources:
+
+All page types carry a `claims:` map (empty `claims: {}` until the page has a
+provenanced fact). See the Claims section below. A page lacking the key is
+treated as `claims: {}` (grandfathered) — never a hard error.
+
+## Claims
+
+Provenanced facts are **claims**: an anchored body bullet under `## Facts` (or a
+synthesis's answer) joined to a `claims:` frontmatter entry by its anchor.
+
+```yaml
+claims:
+  c-db-engine:
+    sources: [ https://internal-wiki/adr-014, qmd://<vault-name>/raw/postmortem.md ]
+    by: wiki-research          # human | wiki-research | deep-research | import
+    asserted_at: 2026-06-03
+    confidence: high           # low | medium | high
+    superseded_by: null        # null | <anchor-id> | qmd://<vault-name>/<path>#<anchor-id>
+```
+
+```markdown
+## Facts
+- Uses DynamoDB for the primary store ^c-db-engine
+```
+
+- The body bullet is the single source of truth for wording; frontmatter holds
+  metadata only.
+- Anchor in the body carries the caret (`^c-db-engine`); the `claims:` key and
+  same-page `superseded_by:` use the bare id (`c-db-engine`); cross-page is
+  `qmd://<vault-name>/<path>#c-<slug>`.
+- Never reverse a fact in place — **supersede** it (see Synthesis/Supersession
+  below): write the new claim, point the old claim's `superseded_by:` at it,
+  move the old bullet to `## Superseded`. Uniform across entity/concept/synthesis.
+- An un-anchored bullet is a valid un-provenanced note (lower trust), not an
+  error.
 
 ## Wikilinks
 
@@ -1801,12 +1836,21 @@ This vault commits after every user-approved write. Pattern:
 
 Git history is the audit trail — there is no separate `log.md`.
 
-## Synthesis pages
+## Synthesis pages and supersession
 
-Never edit an existing synthesis page to change the answer. Instead:
-- Write a new synthesis page with the updated answer at a new slug.
-- Set the old page's `superseded_by:` to the new page's `qmd://<vault-name>/<path>`.
-- Mention the supersession in the new page's body.
+Synthesis pages are freely editable (no write-once). Express the answer as one
+or more anchored conclusion-claims. To change what any page asserts — entity,
+concept, or synthesis — supersede the claim rather than reversing it in place:
+
+- Write the new claim (anchored bullet + `claims:` entry) in the live section.
+- Set the old claim's `superseded_by:` to the successor's anchor id (same-page)
+  or `qmd://<vault-name>/<path>#c-<slug>` (cross-page).
+- Move the old bullet to `## Superseded` with a struck-through line, a one-line
+  reason, and the pointer.
+
+A whole synthesis may also be wholesale-replaced by setting its page-level
+`superseded_by:` to a newer synthesis's `qmd://<vault-name>/<path>`. Superseded
+claims stay in-page and qmd-queryable; live sections show only current truth.
 
 ## What goes into `raw/` (and what `qmd ingest` is NOT used for)
 
@@ -1845,9 +1889,10 @@ See .templates/entity.md, .templates/concept.md, .templates/synthesis.md.
 
 ## Skills
 
-Three committed first-party skills under `.claude/skills/`:
+Four committed first-party skills under `.claude/skills/`:
 
-- **wiki-research** — disciplined research loop: search vault first, optionally invoke deep-research with vault context as a seed, cross-check, write a synthesis page. Default deep-research mode is **UltraDeep**; override only if user explicitly says "quick research" or "standard research". Use it for any non-trivial research request.
+- **wiki-research** — disciplined research loop: search vault first (delegating retrieval to wiki-consult's read core), optionally invoke deep-research with vault context as a seed, cross-check, write claim-backed pages. Default deep-research mode is **UltraDeep**; override only if user explicitly says "quick research" or "standard research". Use it for any non-trivial research request.
+- **wiki-consult** — read-only "what does the vault already know about X?" Trust-ranked, provenance-annotated, freshness- and contradiction-aware. Never writes, supersedes, or hits the web; suggests `/wiki-research` on a gap. The shared retrieval core wiki-research delegates to.
 - **recall** — direct qmd query wrapper for raw debugging. Not used by wiki-research itself; for the human operator.
 - **update-vendors** — vendor autoupdate workflow. Run periodically (or on the weekly nudge from the SessionStart hook).
 
