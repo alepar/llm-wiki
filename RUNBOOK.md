@@ -1,6 +1,6 @@
 # LLM-Wiki Vault Instantiation Runbook
 
-> A single self-sufficient procedure for spinning up a new markdown wiki vault, designed to be fed verbatim to a fresh Claude Code session along with a chosen domain. The session collects three inputs (vault name, identity statement, target directory), then mechanically scaffolds a git-tracked vault with qmd hybrid retrieval, a pinned deep-research submodule, and committed `wiki-research`, `wiki-consult`, and `recall` slash-command skills.
+> A single self-sufficient procedure for spinning up a new markdown wiki vault, designed to be fed verbatim to a fresh Claude Code session along with a chosen domain. The session collects three inputs (vault name, identity statement, target directory), then mechanically scaffolds a git-tracked vault with qmd hybrid retrieval, a pinned deep-research submodule, and committed `wiki-research`, `wiki-consult`, `recall`, and `update-vendors` slash-command skills.
 >
 > **No other file needs to be consulted.** Every literal template, every command, every invariant is reproduced inline. The companion design spec (`docs/superpowers/specs/2026-05-09-llm-wiki-meta-design.md`) contains rationale and alternatives but is not required for execution.
 
@@ -407,7 +407,7 @@ This is a curated markdown wiki. The vault's operating rules are in [`CLAUDE.md`
 
 - `CLAUDE.md` — vault schema and workflow rules, auto-loaded by Claude Code.
 - `.templates/` — frontmatter starters for entity / concept / synthesis pages.
-- `.claude/skills/` — first-party skills (`wiki-research`, `recall`, `update-vendors`) and the pinned submodules (`deep-research`, `obsidian-skills`).
+- `.claude/skills/` — first-party skills (`wiki-research`, `wiki-consult`, `recall`, `update-vendors`) and the pinned submodules (`deep-research`, `obsidian-skills`).
 - `.claude/hooks/` — SessionStart hook for qmd freshness checks.
 - `.qmd/` — per-vault qmd config (`index.yml`) and SQLite index (`index.sqlite`, gitignored).
 - `.mcp.json` — Claude Code MCP config; binds the qmd MCP server to this vault's index.
@@ -2308,7 +2308,7 @@ INDEX_PATH=$(pwd)/.qmd/index.sqlite QMD_CONFIG_DIR=$(pwd)/.qmd qmd status 2>&1
 Verify:
 - A collection named `<vault-name>` is listed.
 - The collection's source path matches `<vault-root>`.
-- The indexed-file count is plausible for a fresh vault (~6–12 files: CLAUDE.md, README.md, three `.templates/*.md`, `raw/README.md`, plus the `wiki-research/playbook.md` and the three first-party SKILL.md files — depending on whether the dotfolder mask traversal includes them).
+- The indexed-file count is plausible for a fresh vault (~6–12 files: CLAUDE.md, README.md, three `.templates/*.md`, `raw/README.md`, plus the `wiki-research/playbook.md` and the four first-party SKILL.md files — depending on whether the dotfolder mask traversal includes them).
 - The SQLite file lives at `<vault-root>/.qmd/index.sqlite` (not at `~/.cache/qmd/index.sqlite`):
   ```bash
   test -f $(pwd)/.qmd/index.sqlite && echo "per-vault index OK" || echo "ERROR: index landed at the wrong path"
