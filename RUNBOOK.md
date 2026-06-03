@@ -2518,7 +2518,7 @@ Sections of the spec deliberately omitted from the runbook:
 - §2.3 ("What this is not") — captured in Part I.2 in condensed form.
 - §7.1–7.6 retrieval-primitives prose — relevant content is reproduced inside the vault `CLAUDE.md` template (Phase 5), where it actually needs to live for runtime use.
 - §8 deep-research integration — relevant content is in Phase 4 and in the wiki-research playbook (Task 3.3).
-- §9 wiki-research skill description — entire skill body is inlined at Task 3.3.
+- §9 wiki-research skill description — entire skill body is inlined at Task 3.2 (the playbook is Task 3.3).
 - §10 lint checklist — reproduced inside the vault `CLAUDE.md` template (Phase 5).
 - §11 /recall skill description — entire skill body is inlined at Task 3.1.
 - §12 instantiation playbook — superseded by Part III of this runbook.
